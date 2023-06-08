@@ -1,0 +1,12 @@
+{
+    "files.associations": {
+        "lv_examples.h": "c",
+        "stm32f429i_discovery.h": "c",
+        "lv_example_scroll.h": "c",
+        "lv_example_style.h": "c",
+        "lv_example_get_started.h": "c",
+        "lv_example_anim.h": "c",
+        "lvgl.h": "c",
+        "stm32f4xx.h": "c"
+    }
+}
