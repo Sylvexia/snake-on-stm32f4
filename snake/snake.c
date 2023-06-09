@@ -17,6 +17,7 @@ enum GridState
     EMPTY,
     HEAD,
     BODY,
+    TAIL,
     FOOD
 };
 
@@ -53,12 +54,12 @@ typedef struct
     SnakeNode *tail;
 } Snake;
 
-static int8_t row_size = 6;
-static int8_t col_size = 8;
+static int8_t row_size = 9;
+static int8_t col_size = 12;
 
 volatile static Snake snake;
 volatile static Playground **playground;
-static lv_obj_t *dir_label;
+static lv_obj_t *coord_label;
 static lv_obj_t *dir_btns;
 
 #define GROUND_COLOR lv_color_make(31, 30, 51)
@@ -72,31 +73,22 @@ int mod(int x, int y)
     return t;
 }
 
-static void draw_dir_label()
+static void init_coord_label()
 {
-    // switch (snake.dirs)
-    // {
-    // case UP:
-    //     lv_label_set_text(dir_label, "UP");
-    //     break;
-    // case RIGHT:
-    //     lv_label_set_text(dir_label, "RIGHT");
-    //     break;
-    // case DOWN:
-    //     lv_label_set_text(dir_label, "DOWN");
-    //     break;
-    // case LEFT:
-    //     lv_label_set_text(dir_label, "LEFT");
-    //     break;
-    // case IDLE:
-    //     lv_label_set_text(dir_label, "IDLE");
-    //     break;
-    // }
+    coord_label = lv_label_create(lv_scr_act());
+    lv_label_set_long_mode(coord_label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(coord_label, 150);
+    lv_label_set_text(coord_label, "IDLE");
+    lv_obj_set_style_text_align(coord_label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(coord_label, LV_ALIGN_TOP_RIGHT, 40, 0);
+}
 
+static void draw_coord_label()
+{
     char buf[32] = "";
     sprintf(buf, "x:%u y: %u", snake.head->pos.x, snake.head->pos.y);
 
-    lv_label_set_text(dir_label, buf);
+    lv_label_set_text(coord_label, buf);
 }
 
 static void init_playground()
@@ -116,6 +108,9 @@ static void init_playground()
             playground[i][j].rect = lv_obj_create(lv_scr_act());
             lv_obj_set_size(playground[i][j].rect, grid_width, grid_height);
             lv_obj_set_pos(playground[i][j].rect, j * grid_width, y_offset + i * grid_height);
+            lv_obj_set_style_border_width(playground[i][j].rect, 0, LV_PART_MAIN);
+            lv_obj_set_style_outline_width(playground[i][j].rect, 0, LV_PART_MAIN);
+            lv_obj_clear_flag(playground[i][j].rect, LV_OBJ_FLAG_SCROLLABLE);
             lv_obj_set_style_radius(playground[i][j].rect, 0, LV_PART_MAIN);
             lv_obj_set_style_bg_color(playground[i][j].rect, GROUND_COLOR, LV_PART_MAIN);
         }
@@ -165,22 +160,24 @@ static void pop_back_snake()
 
 static void init_snake()
 {
+    Coord pos;
+    pos.x = col_size / 2;
+    pos.y = row_size / 2;
+
     snake.dirs = IDLE;
     snake.head = NULL;
     snake.tail = NULL;
     snake.len = 0;
 
-    Coord pos;
-    pos.x = col_size / 2;
-    pos.y = row_size / 2;
     push_front_snake(pos);
+    playground[pos.y][pos.x].state = HEAD;
 }
 
 static void snake_move()
 {
-    Coord cur = snake.head->pos;
-    int8_t next_x = cur.x;
-    int8_t next_y = cur.y;
+    Coord cur_coord = snake.head->pos;
+    int8_t next_x = cur_coord.x;
+    int8_t next_y = cur_coord.y;
 
     switch (snake.dirs)
     {
@@ -202,12 +199,12 @@ static void snake_move()
     next_y = mod(next_y, row_size);
 
     // update snake
-    Coord new;
-    new.x = next_x;
-    new.y = next_y;
+    Coord new_coord;
+    new_coord.x = next_x;
+    new_coord.y = next_y;
 
     pop_back_snake();
-    push_front_snake(new);
+    push_front_snake(new_coord);
 }
 
 static void draw_playground()
@@ -232,8 +229,8 @@ static void game_timer_cb(lv_timer_t *timer)
 {
     snake_move();
 
-    draw_dir_label();
-    // draw_playground();
+    draw_coord_label();
+    draw_playground();
 }
 
 static void dirs_btn_handler(lv_event_t *e)
@@ -248,32 +245,20 @@ static void dirs_btn_handler(lv_event_t *e)
         int8_t temp_dirs = -10;
 
         if (strcmp(txt, "Up") == 0)
-        {
             temp_dirs = UP;
-        }
         else if (strcmp(txt, "Right") == 0)
-        {
             temp_dirs = RIGHT;
-        }
         else if (strcmp(txt, "Down") == 0)
-        {
             temp_dirs = DOWN;
-        }
         else if (strcmp(txt, "Left") == 0)
-        {
             temp_dirs = LEFT;
-        }
 
         if (snake.len <= 1)
-        {
             snake.dirs = temp_dirs;
-            return;
-        }
+        return;
 
         if (snake.dirs == -temp_dirs)
-        {
             return;
-        }
 
         snake.dirs = temp_dirs;
     }
@@ -285,14 +270,7 @@ static const char *dir_btn_map[] = {"Up", "\n",
 
 void snake_game(void)
 {
-    dir_label = lv_label_create(lv_scr_act());
-    lv_label_set_long_mode(dir_label, LV_LABEL_LONG_WRAP);
-    lv_label_set_recolor(dir_label, true);
-    lv_obj_set_width(dir_label, 150);
-    lv_label_set_text(dir_label, "IDLE");
-    lv_obj_set_style_text_align(dir_label, LV_TEXT_ALIGN_CENTER, 0);
-    lv_obj_align(dir_label, LV_ALIGN_TOP_MID, 0, 0);
-
+    init_coord_label();
     init_snake();
     init_playground();
 
