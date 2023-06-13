@@ -1,3 +1,5 @@
+// the snake is queue, so tail is actually head and vice versa
+
 #include "snake.h"
 
 #define BG_WIDTH 240
@@ -43,7 +45,6 @@ typedef struct
 {
     Coord pos;
     struct SnakeNode *next;
-    struct SnakeNode *prev;
 } SnakeNode;
 
 typedef struct
@@ -64,6 +65,8 @@ static lv_obj_t *dir_btns;
 
 #define GROUND_COLOR lv_color_make(31, 30, 51)
 #define SNAKE_COLOR lv_color_make(0, 255, 0)
+#define FOOD_COLOR lv_color_make(255, 255, 0)
+#define HEAD_COLOR lv_color_make(2, 48, 32)
 
 int mod(int x, int y)
 {
@@ -78,7 +81,6 @@ static void init_coord_label()
     coord_label = lv_label_create(lv_scr_act());
     lv_label_set_long_mode(coord_label, LV_LABEL_LONG_WRAP);
     lv_obj_set_width(coord_label, 150);
-    lv_label_set_text(coord_label, "IDLE");
     lv_obj_set_style_text_align(coord_label, LV_TEXT_ALIGN_CENTER, 0);
     lv_obj_align(coord_label, LV_ALIGN_TOP_RIGHT, 40, 0);
 }
@@ -89,6 +91,27 @@ static void draw_coord_label()
     sprintf(buf, "x:%u y: %u", snake.head->pos.x, snake.head->pos.y);
 
     lv_label_set_text(coord_label, buf);
+}
+
+static uint8_t collision_food(Coord cur_coord)
+{
+    return (playground[cur_coord.y][cur_coord.x].state == FOOD);
+}
+
+static void generate_food()
+{
+    // generate the food tha does not have the food and head
+    Coord food_coord;
+    food_coord.x = rand() % col_size;
+    food_coord.y = rand() % row_size;
+
+    while (playground[food_coord.y][food_coord.x].state != EMPTY)
+    {
+        food_coord.x = rand() % col_size;
+        food_coord.y = rand() % row_size;
+    }
+
+    playground[food_coord.y][food_coord.x].state = FOOD;
 }
 
 static void init_playground()
@@ -112,46 +135,52 @@ static void init_playground()
             lv_obj_set_style_outline_width(playground[i][j].rect, 0, LV_PART_MAIN);
             lv_obj_clear_flag(playground[i][j].rect, LV_OBJ_FLAG_SCROLLABLE);
             lv_obj_set_style_radius(playground[i][j].rect, 0, LV_PART_MAIN);
-            lv_obj_set_style_bg_color(playground[i][j].rect, GROUND_COLOR, LV_PART_MAIN);
         }
     }
     playground[row_size / 2][col_size / 2].state = HEAD;
 }
 
-static void push_front_snake(Coord pos)
+static void push_snake(Coord pos)
 {
+    if (snake.len > 0)
+    {
+        Coord old_pos = snake.tail->pos;
+        playground[old_pos.y][old_pos.x].state = BODY;
+    }
+    Coord new_pos = pos;
+    playground[new_pos.y][new_pos.x].state = HEAD;
+
     SnakeNode *new_node = (SnakeNode *)malloc(sizeof(SnakeNode));
     new_node->pos.x = pos.x;
     new_node->pos.y = pos.y;
-    new_node->prev = NULL;
 
     if (snake.len == 0)
     {
-        snake.head = snake.tail = new_node;
-        new_node->next = NULL;
+        snake.head = new_node;
+        snake.tail = new_node;
     }
     else
     {
-        new_node->next = snake.head;
-        snake.head->prev = new_node;
-        snake.head = new_node;
+        snake.tail->next = new_node;
+        snake.tail = new_node;
     }
 
     snake.len++;
 }
 
-static void pop_back_snake()
+static void pop_snake()
 {
     if (snake.len == 0)
         return;
 
-    SnakeNode *temp = snake.tail;
-    snake.tail = snake.tail->prev;
+    SnakeNode *temp = snake.head;
+    Coord old_pos = temp->pos;
+    snake.head = temp->next;
 
-    if (snake.tail = NULL)
-        snake.head = NULL;
-    else
-        snake.tail->next = NULL;
+    if (snake.head == NULL)
+        snake.tail = NULL;
+
+    playground[old_pos.y][old_pos.x].state = EMPTY;
 
     free(temp);
 
@@ -164,18 +193,18 @@ static void init_snake()
     pos.x = col_size / 2;
     pos.y = row_size / 2;
 
-    snake.dirs = IDLE;
+    snake.dirs = RIGHT;
     snake.head = NULL;
     snake.tail = NULL;
     snake.len = 0;
 
-    push_front_snake(pos);
+    push_snake(pos);
     playground[pos.y][pos.x].state = HEAD;
 }
 
 static void snake_move()
 {
-    Coord cur_coord = snake.head->pos;
+    Coord cur_coord = snake.tail->pos;
     int8_t next_x = cur_coord.x;
     int8_t next_y = cur_coord.y;
 
@@ -203,8 +232,12 @@ static void snake_move()
     new_coord.x = next_x;
     new_coord.y = next_y;
 
-    pop_back_snake();
-    push_front_snake(new_coord);
+    if (!collision_food(new_coord))
+        pop_snake();
+    else
+        generate_food();
+
+    push_snake(new_coord);
 }
 
 static void draw_playground()
@@ -213,16 +246,30 @@ static void draw_playground()
     {
         for (uint8_t j = 0; j < col_size; j++)
         {
-            lv_obj_set_style_bg_color(playground[i][j].rect, GROUND_COLOR, LV_PART_MAIN);
+            switch (playground[i][j].state)
+            {
+            case HEAD:
+                lv_obj_set_style_bg_color(playground[i][j].rect, HEAD_COLOR, LV_PART_MAIN);
+                break;
+            case BODY:
+                lv_obj_set_style_bg_color(playground[i][j].rect, SNAKE_COLOR, LV_PART_MAIN);
+                break;
+            case FOOD:
+                lv_obj_set_style_bg_color(playground[i][j].rect, FOOD_COLOR, LV_PART_MAIN);
+                break;
+            case EMPTY:
+                lv_obj_set_style_bg_color(playground[i][j].rect, GROUND_COLOR, LV_PART_MAIN);
+                break;
+            }
         }
     }
 
-    SnakeNode *cur = snake.head;
-    while (cur != NULL)
-    {
-        lv_obj_set_style_bg_color(playground[cur->pos.y][cur->pos.x].rect, SNAKE_COLOR, LV_PART_MAIN);
-        cur = cur->next;
-    }
+    // SnakeNode *cur = snake.head;
+    // while (cur != NULL)
+    // {
+    //     lv_obj_set_style_bg_color(playground[cur->pos.y][cur->pos.x].rect, SNAKE_COLOR, LV_PART_MAIN);
+    //     cur = cur->next;
+    // }
 }
 
 static void game_timer_cb(lv_timer_t *timer)
@@ -254,8 +301,10 @@ static void dirs_btn_handler(lv_event_t *e)
             temp_dirs = LEFT;
 
         if (snake.len <= 1)
+        {
             snake.dirs = temp_dirs;
-        return;
+            return;
+        }
 
         if (snake.dirs == -temp_dirs)
             return;
@@ -270,9 +319,12 @@ static const char *dir_btn_map[] = {"Up", "\n",
 
 void snake_game(void)
 {
+    srand(time(0));
     init_coord_label();
     init_snake();
     init_playground();
+    generate_food();
+    draw_playground();
 
     dir_btns = lv_btnmatrix_create(lv_scr_act());
     lv_btnmatrix_set_map(dir_btns, dir_btn_map);
