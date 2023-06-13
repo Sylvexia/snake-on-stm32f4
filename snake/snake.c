@@ -1,4 +1,4 @@
-// the snake is queue, so tail is actually head and vice versa
+// the snake is queue, so snake.tail is actually head and vice versa
 
 #include "snake.h"
 
@@ -61,12 +61,13 @@ static int8_t col_size = 12;
 volatile static Snake snake;
 volatile static Playground **playground;
 static lv_obj_t *coord_label;
+static lv_obj_t *score_label;
 static lv_obj_t *dir_btns;
 
 #define GROUND_COLOR lv_color_make(31, 30, 51)
 #define SNAKE_COLOR lv_color_make(0, 255, 0)
 #define FOOD_COLOR lv_color_make(255, 255, 0)
-#define HEAD_COLOR lv_color_make(2, 48, 32)
+#define HEAD_COLOR lv_color_make(152, 251, 152)
 
 int mod(int x, int y)
 {
@@ -74,6 +75,20 @@ int mod(int x, int y)
     if (t < 0)
         t += y;
     return t;
+}
+
+static void init_score_label()
+{
+    score_label = lv_label_create(lv_scr_act());
+    lv_label_set_long_mode(score_label, LV_LABEL_LONG_WRAP);
+    lv_obj_set_width(score_label, 150);
+    lv_obj_set_style_text_align(score_label, LV_TEXT_ALIGN_CENTER, 0);
+    lv_obj_align(score_label, LV_ALIGN_TOP_LEFT, -40, 0);
+}
+
+static void draw_score_label()
+{
+    lv_label_set_text_fmt(score_label, "Score: %d", snake.len - 1);
 }
 
 static void init_coord_label()
@@ -87,13 +102,15 @@ static void init_coord_label()
 
 static void draw_coord_label()
 {
-    char buf[32] = "";
-    sprintf(buf, "x:%u y: %u", snake.head->pos.x, snake.head->pos.y);
-
-    lv_label_set_text(coord_label, buf);
+    lv_label_set_text_fmt(coord_label, "x:%u y: %u", snake.head->pos.x, snake.head->pos.y);
 }
 
-static uint8_t collision_food(Coord cur_coord)
+static bool collision_body(Coord cur_coord)
+{
+    return (playground[cur_coord.y][cur_coord.x].state == BODY);
+}
+
+static bool collision_food(Coord cur_coord)
 {
     return (playground[cur_coord.y][cur_coord.x].state == FOOD);
 }
@@ -237,6 +254,21 @@ static void snake_move()
     else
         generate_food();
 
+    if (collision_body(new_coord)) // touch the body, game over, reset game state
+    {
+        // pop all snake node from queue
+        while (snake.len > 0)
+            pop_snake();
+        init_snake();
+        for (uint8_t i = 0; i < row_size; i++)
+        {
+            for (uint8_t j = 0; j < col_size; j++)
+                playground[i][j].state = EMPTY;
+        }
+        generate_food();
+        return; // this is kinda hacky, but it works
+    }
+    
     push_snake(new_coord);
 }
 
@@ -263,13 +295,6 @@ static void draw_playground()
             }
         }
     }
-
-    // SnakeNode *cur = snake.head;
-    // while (cur != NULL)
-    // {
-    //     lv_obj_set_style_bg_color(playground[cur->pos.y][cur->pos.x].rect, SNAKE_COLOR, LV_PART_MAIN);
-    //     cur = cur->next;
-    // }
 }
 
 static void game_timer_cb(lv_timer_t *timer)
@@ -277,6 +302,7 @@ static void game_timer_cb(lv_timer_t *timer)
     snake_move();
 
     draw_coord_label();
+    draw_score_label();
     draw_playground();
 }
 
@@ -320,9 +346,11 @@ static const char *dir_btn_map[] = {"Up", "\n",
 void snake_game(void)
 {
     srand(time(0));
+
     init_coord_label();
     init_snake();
     init_playground();
+    init_score_label();
     generate_food();
     draw_playground();
 
