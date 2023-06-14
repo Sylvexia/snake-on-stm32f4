@@ -122,7 +122,7 @@ static void generate_food()
     food_coord.x = rand() % col_size;
     food_coord.y = rand() % row_size;
 
-    while (playground[food_coord.y][food_coord.x].state != EMPTY)
+    while (playground[food_coord.y][food_coord.x].state != EMPTY) // TODO: push all non_empty to array and choose randomly from that array
     {
         food_coord.x = rand() % col_size;
         food_coord.y = rand() % row_size;
@@ -268,7 +268,7 @@ static void snake_move()
         generate_food();
         return; // this is kinda hacky, but it works
     }
-    
+
     push_snake(new_coord);
 }
 
@@ -299,6 +299,7 @@ static void draw_playground()
 
 static void game_timer_cb(lv_timer_t *timer)
 {
+    //get_joy_state();
     snake_move();
 
     draw_coord_label();
