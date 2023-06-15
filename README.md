@@ -1,15 +1,34 @@
-# LVGL ported to STM32f429 Discovery
+# 高雄大學 嵌入式系統 期末專案 貪食蛇
 
-Cheap development board with 240x320 TFT, Resistive touch pad, 180 MHz MCU with 256kB RAM + 64 MBit SDRAM and GPU.
+## 環境：
 
-The CubeMX drivers are used to initilaize the peripheries. 
+- 裝置：stm32f429zit6
+- 使用cubeide編譯
+- 框架：LVGL 8.3
+- C語言
 
-In *hal_stm_lvgl/tft/tft.h* you can enable/disable external frame buffer placement and GPU usage. 
+## 要點：
 
-The project is created with CubeIDE IDE.
+- 貪食蛇主要使用類似queue更新資料
+    - 使用linked list 實作
+    - 針對頭部和尾部做操作，直覺的聯想到使用queue
+    - 和一般的queue相反，在尾部消除資料，頭部新增使用者新指向的方格，藉此更新蛇
+    - 如果和食物重疊則不在尾部清除資料
+    - 最初是實作dequeue，但是double linked list指標更新有點太麻煩所以就還是用單向linked list就好
 
+- 場地更新主要使用陣列紀錄，藉此食物不會生成在蛇身上。更新的部份是使用500ms的timer去refresh資料的狀態。
 
-## Get started
-- Clone the project: `git clone https://github.com/littlevgl/stm32f429_disco_no_os_sw4stm32.git --recurse-submodules`
-- Import it to CubeIDE
-`
+- 界面下方的按鈕是藉由lvgl的button matrix實現，事實上藉由這個要拉出一個鍵盤都很簡單。
+
+- 最困難的是render出方塊，在創建了一個lv_obj的時候要一一的把scroll bar、圓角、padding拿掉。在官方forum求救對方說有一次拿掉的方法再一一的加回來，可是我沒有實作出來。
+
+- 使用動態記憶體配置，事實上可以動態調整場地大小，有打算做個選單之類的設定，但得肺炎+時間+拖延症的關係就沒有。
+
+- 程式大多沒有實現deinit去釋放記憶體資料，只有在蛇死了才會所有蛇全部釋放。~~場地本身尚未實現因為我相信各位只要按開發板上面的reset就好了~~
+
+## 致謝：
+
+- 感謝[此專案](https://github.com/lvgl/lv_port_stm32f429_disco)
+- 感謝學姐 黃詩芳 的協助，在我得肺炎這段期間罩了我一把。
+- 感謝教授 林宏益 出借開發板暫時替代我壞掉的開發板以讓本專案繼續開發下去。
+- ~~感謝藥的副作用讓我半夜五點火燒心加速專案的完成~~
